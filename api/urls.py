@@ -2,9 +2,18 @@ from django.urls import include, path
 from api import views
 
 
+authentication_urls = [
+    path('register/', views.user_registration, name='user_registration'),
+    path('login/', views.user_login, name='user_login')
+]
+
+relative_urls = [
+    path('users/', include(authentication_urls)),
+
+]
+
 urlpatterns = [
-    path('v1/users/register/', views.user_registration, name='user_registeration'),
-    path('v1/users/login/', views.user_login, name='user_login'),
+    path('v1/', include(relative_urls))
     # path('v1/', include('users.urls')),
     # path('v1/', include('points.urls')),
     # path('v1/', include('waste_types.urls')),

@@ -3,6 +3,8 @@ import re
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
+from api.service import validate_inn_by_api
+from config.constants import NAME_PATTERN
 from users.models import Organization, User
 
 
@@ -50,8 +52,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return data
 
     def validate_username(self, value):
-        pattern = r'^[\w.@+-]+\Z'
-        if not re.fullmatch(pattern, value):
+        if not re.fullmatch(NAME_PATTERN, value):
             raise serializers.ValidationError(
                 'Введенное имя некорректно'
             )
@@ -65,16 +66,54 @@ class UserLoginSerializer(serializers.Serializer):
     )
 
 
-class OrganizationRegistrationSerializer(serializers.ModelSerializer):
+class OrganizationSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField()
 
     class Meta:
         fields = (
+            'user',
             'name',
             'inn',
-            'phone',
             'email',
         )
         model = Organization
 
-    def create(self, validated_data):
-        return super().create(validated_data)
+    def validate(self, data):
+        if (self.context['request'].method == 'POST'
+                and self.user.has_organization):
+            raise serializers.ValidationError(
+                'Вы не можете состоять сразу в нескольких организациях'
+            )
+        return data
+
+    def validate_name(self, value):
+        if not re.fullmatch(NAME_PATTERN, value):
+            raise serializers.ValidationError(
+                'Введенное имя некорректно'
+            )
+        return value
+
+    def validate_inn(self, value):
+        organization_by_inn = Organization.objects.filter(inn=value).first()
+        if organization_by_inn:
+            raise serializers.ValidationError(
+                'Организация с таким ИНН уже существует'
+            )
+        if not validate_inn_by_api(value):
+            raise serializers.ValidationError(
+                'Компания по данному ИНН не найдена'
+            )
+        return value
+
+    def validate_email(self, value):
+        organization_by_email = Organization.objects.filter(
+            email=value
+        ).first()
+        if organization_by_email:
+            raise serializers.ValidationError(
+                'Организация с таким email уже существует'
+            )
+
+
+class PointSerializer(serializers.ModelSerializer):
+    pass
