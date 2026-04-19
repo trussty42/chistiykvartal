@@ -69,11 +69,11 @@
                         <div class="filter-group">
                             <h4>Типы отходов</h4>
                             <div class="checkbox-list">
-                                <label class="checkbox-item"><input type="checkbox" checked> Пластик</label>
+                                <label class="checkbox-item"><input type="checkbox"> Пластик</label>
                                 <label class="checkbox-item"><input type="checkbox"> Стекло</label>
                                 <label class="checkbox-item"><input type="checkbox"> Электроника</label>
                                 <label class="checkbox-item"><input type="checkbox"> Металл</label>
-                                <label class="checkbox-item"><input type="checkbox" checked> Бумага и картон</label>
+                                <label class="checkbox-item"><input type="checkbox"> Бумага и картон</label>
                                 <label class="checkbox-item"><input type="checkbox"> Мебель и крупногабарит</label>
                                 <label class="checkbox-item"><input type="checkbox"> Текстиль</label>
                                 <label class="checkbox-item"><input type="checkbox"> Батарейки</label>
@@ -87,9 +87,9 @@
                         <div class="filter-group">
                             <h4>Цена за кг, руб</h4>
                             <div class="price-range">
-                                <input type="number" class="price-input" placeholder="от">
+                                <input type="number" class="price-input" placeholder="от" min="0">
                                 <span>-</span>
-                                <input type="number" class="price-input" placeholder="до">
+                                <input type="number" class="price-input" placeholder="до" min="0">
                             </div>
                         </div>
 
@@ -176,5 +176,51 @@
                 </div>
             </div>
         </footer>
+
+        <div class="modal-overlay" id="productModal">
+            <div class="modal-content">
+                <button type="button" class="modal-close" aria-label="Закрыть">&times;</button>
+                
+                <div class="modal-body-two-columns">
+                    <div class="modal-left-column">
+                        <div class="modal-image">
+                            <img id="modalImg" src="" alt="">
+                        </div>
+                        <div class="modal-main-info">
+                            <h2 id="modalTitle" class="modal-title"></h2>
+                            <p id="modalCategory" class="modal-meta"></p>
+                            <div class="modal-price" id="modalPrice"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-right-column">
+                        <div class="modal-section">
+                            <h3 class="modal-section-title">
+                                Как подготовить к сдаче?
+                            </h3>
+                            <ul id="modalPreparation" class="modal-list"></ul>
+                        </div>
+                        
+                        <div class="modal-section">
+                            <h3 class="modal-section-title">
+                                Что не принимается?
+                            </h3>
+                            <ul id="modalNotAccepted" class="modal-list not-accepted"></ul>
+                        </div>
+                        
+                        <div class="modal-section">
+                            <h3 class="modal-section-title">
+                                Во что может быть переработано?
+                            </h3>
+                            <p id="modalRecycled" class="modal-recycled-text"></p>
+                        </div>
+                        
+                        <div class="modal-actions">
+                            <a href="map.html" class="btn-primary">Найти пункт приёма</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </body>
 </html>
