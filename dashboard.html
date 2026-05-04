@@ -11,7 +11,7 @@
         <link rel="icon" href="./images/logo.svg" type="image/svg+xml">
         <script src="./scripts/auth.js" defer></script>
         <script src="./scripts/toast.js" defer></script>
-        <script src="./scripts/dashboard.js"></script>
+        <script src="./scripts/dashboard.js" defer></script>
     </head>
     <body>
         <header class="header">
@@ -229,46 +229,27 @@
                         </div>
                     </div>
 
+
                     <div class="tab-content" id="organizations-tab">
-                        <div class="history-header-info">
-                            <h2 class="dashboard-title">Мои организации</h2>
-                            <p class="history-hint">Вы можете создать 1 организацию и быть участником в нескольких.</p>
-                        </div>
+                        <h2 class="dashboard-title">Мои организации</h2>
                         <div class="org-header">
-                            <button class="btn-primary btn-add-submission" id="createOrgBtn">Создать организацию</button>
+                            <button class="btn-primary" id="createOrgBtn"> Создать организацию </button>
                         </div>
 
+                        <!-- Список организаций -->
                         <div class="org-list" id="orgList">
                             <!-- Заполняется через JS -->
                         </div>
-                    </div>
 
+                        <!-- Пустое состояние -->
+                        <div class="org-empty" id="orgEmpty" style="display: none;">
+                            <h3>У вас пока нет организаций</h3>
+                            <p>Создайте свою первую организацию по приёму вторсырья или примите приглашение от другой.</p>
+                        </div>
+                    </div>
                 </section>
             </div>
         </main>
-
-        <!-- Модальное окно создания организации -->
-        <div class="modal-overlay" id="createOrgModal">
-            <div class="modal-content">
-                <button class="modal-close" id="closeOrgModal">&times;</button>
-                <h3>Создание организации</h3>
-                <form id="createOrgForm">
-                    <div class="form-group">
-                        <label>Название организации *</label>
-                        <input type="text" name="orgName" required />
-                    </div>
-                    <div class="form-group">
-                        <label>ИНН</label>
-                        <input type="text" name="inn" pattern="[0-9]{10,12}" />
-                    </div>
-                    <div class="form-group">
-                        <label>Описание</label>
-                        <textarea name="description" rows="3"></textarea>
-                    </div>
-                    <button type="submit" class="btn-primary">Отправить на проверку</button>
-                </form>
-            </div>
-        </div>
 
         <footer class="footer">
             <div class="footer__container">
@@ -319,6 +300,27 @@
                 </div>
             </div>
         </footer>
+
+        <!-- Модальное окно создания организации -->
+        <div class="modal-overlay" id="createOrgModal">
+            <div class="modal-content">
+                <button class="modal-close" id="closeOrgModal">&times;</button>
+                <h3>Создание организации</h3>
+                <form id="createOrgForm">
+                    <div class="form-group">
+                        <label>Название организации</label>
+                        <input type="text" name="orgName" placeholder="Например: Эко-Урал" />
+                    </div>
+                    <div class="form-group">
+                        <label>ИНН</label>
+                        <input type="text" name="inn" pattern="[0-9]{10,12}" placeholder="10 или 12 цифр" required/>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Отправить на проверку</button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         <!-- Модальное окно создания заявки -->
         <div class="modal-overlay" id="submissionModal">

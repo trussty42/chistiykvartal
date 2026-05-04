@@ -104,65 +104,7 @@ const achievementsData = [
     }
 ];
 
-const organizationsData = [
-    { id: 1, name: 'Эко-Урал', role: 'Владелец', status: 'pending' },
-    { id: 2, name: 'Чистый город', role: 'Участник', status: 'verified' }
-];
-
-// ===== СИСТЕМА УВЕДОМЛЕНИЙ (TOASTS) =====
-const toasts = {
-    _create(message, type, options = {}) {
-        const oldToast = document.querySelector('.toast-notification');
-        if (oldToast) oldToast.remove();
-
-        const toast = document.createElement('div');
-        toast.className = `toast-notification ${type}`;
-        
-        const title = options.title ? `<div class="toast-title">${options.title}</div>` : '';
-        const duration = options.duration || 4000;
-        
-        toast.innerHTML = `
-            <div class="toast-content">
-                ${title}
-                <div class="toast-message">${message.replace(/\n/g, '<br>')}</div>
-            </div>
-        `;
-        
-        document.body.appendChild(toast);
-        
-        setTimeout(() => {
-            toast.classList.add('hide');
-            setTimeout(() => toast.remove(), 300);
-        }, duration);
-    },
-    
-    success(message, options = {}) {
-        this._create(message, 'success', options);
-    },
-    
-    tip(message, tipText, options = {}) {
-        const fullMessage = `${message}<br><br>Совет: ${tipText}`;
-        this._create(fullMessage, 'tip', { 
-            title: options.title || 'Заявка принята', 
-            duration: options.duration || 6000 
-        });
-    },
-    
-    achievement(message, options = {}) {
-        this._create(message, 'achievement', { 
-            title: options.title || 'Достижение разблокировано!', 
-            duration: options.duration || 7000 
-        });
-    },
-    
-    warning(message, options = {}) {
-        this._create(message, 'warning', options);
-    },
-    
-    info(message, options = {}) {
-        this._create(message, 'info', options);
-    }
-};
+const organizationsData = [];
 
 // ===== ИНИЦИАЛИЗАЦИЯ =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -171,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initHistoryModal();
     initAchievements();
     initOrganizations();
+    initOrgModalOnce();
     initTabs();
     initLogout();
     initAvatarUpload();
@@ -579,13 +522,25 @@ function updateAchievements() {
     // Загружаем сохранённые достижения
     const saved = localStorage.getItem('ck_achievements');
     if (saved) {
-        const savedData = JSON.parse(saved);
-        achievementsData.forEach(ach => {
-            const savedAch = savedData.find(s => s.id === ach.id);
-            if (savedAch) {
-                ach.unlocked = savedAch.unlocked;
+        try {
+            const savedData = JSON.parse(saved);
+            // Проверяем, что savedData — это массив
+            if (Array.isArray(savedData)) {
+                achievementsData.forEach(ach => {
+                    const savedAch = savedData.find(s => s.id === ach.id);
+                    if (savedAch) {
+                        ach.unlocked = savedAch.unlocked;
+                    }
+                });
+            } else {
+                // Если старый формат — очищаем localStorage
+                console.warn('Старый формат достижений, сбрасываем');
+                localStorage.removeItem('ck_achievements');
             }
-        });
+        } catch (e) {
+            console.error('Ошибка чтения достижений:', e);
+            localStorage.removeItem('ck_achievements');
+        }
     }
     
     // Собираем статистику пользователя
@@ -649,16 +604,14 @@ function updateAchievements() {
         
         if (shouldUnlock) {
             ach.unlocked = true;
-            // Показываем уведомление о новом достижении только при первой разблокировке
-            if (!saved || !saved.find(s => s.id === ach.id)?.unlocked) {
-                toasts.achievement(
-                    `Получено достижение "${ach.title}"!`,
-                    { 
-                        title: 'Достижение разблокировано',
-                        duration: 6000 
-                    }
-                );
-            }
+            // Показываем уведомление о новом достижении
+            toasts.achievement(
+                `Получено достижение "${ach.title}"!`,
+                { 
+                    title: 'Достижение разблокировано',
+                    duration: 6000 
+                }
+            );
         }
     });
 }
@@ -727,14 +680,27 @@ function saveAchievements() {
 }
 
 function initOrganizations() {
+    const savedOrgs = JSON.parse(localStorage.getItem('ck_orgRequests')) || [];
+    savedOrgs.forEach(savedOrg => {
+        if (!organizationsData.find(o => o.id === savedOrg.id)) {
+            organizationsData.push(savedOrg);
+        }
+    });
+    
     const orgCount = document.getElementById('orgCount');
     if (orgCount) orgCount.textContent = organizationsData.length;
+
+    const createBtn = document.getElementById('createOrgBtn');
+    if (createBtn) {
+        const owned = organizationsData.filter(o => o.role === 'Владелец').length;
+        createBtn.style.display = owned >= 1 ? 'none' : 'inline-flex';
+    }
     
     const orgList = document.getElementById('orgList');
     if (!orgList) return;
-    
+
     orgList.innerHTML = organizationsData.map(org => `
-        <div class="org-card" onclick="openOrgDashboard(${org.id})">
+        <div class="org-card" data-id="${org.id}" style="cursor: pointer;">
             <div class="org-info">
                 <span class="org-name">${org.name}</span>
                 <span class="org-role">${org.role}</span>
@@ -743,50 +709,111 @@ function initOrganizations() {
                 <span class="org-status ${org.status}">
                     ${org.status === 'verified' ? 'Проверена' : org.status === 'pending' ? 'На проверке' : 'Отклонена'}
                 </span>
-                ${org.role === 'Владелец' ? `<button class="org-btn org-btn-secondary" onclick="event.stopPropagation()">Настроить</button>` : ''}
             </div>
         </div>
     `).join('');
 
-    const modal = document.getElementById('createOrgModal');
+    // Клик по организации → переход в кабинет
+    orgList.onclick = (e) => {
+        const card = e.target.closest('.org-card');
+        if (card) {
+            const orgId = card.dataset.id;
+            window.location.href = `org-dashboard.html?id=${orgId}`;
+        }
+    };
+}
+
+function initOrgModalOnce() {
     const createBtn = document.getElementById('createOrgBtn');
-    
+    const modal = document.getElementById('createOrgModal');
+    const closeBtn = document.getElementById('closeOrgModal');
+    const createForm = document.getElementById('createOrgForm');
+
+    console.log('🔍 initOrgModalOnce:', { createBtn, modal, closeBtn, createForm });
+
     if (createBtn) {
         createBtn.addEventListener('click', () => {
             const owned = organizationsData.filter(o => o.role === 'Владелец').length;
             if (owned >= 1) {
-                alert('Вы уже владеете одной организацией.');
+                toasts?.warning('Вы уже владеете одной организацией.', { duration: 3000 });
                 return;
             }
             if (modal) modal.classList.add('active');
         });
     }
 
-    const closeBtn = document.getElementById('closeOrgModal');
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
-            if (modal) modal.classList.remove('active');
+            if (modal) {
+                modal.classList.remove('active');
+                createForm?.reset();
+            }
         });
     }
 
     if (modal) {
         modal.addEventListener('click', (e) => {
-            if (e.target === modal) modal.classList.remove('active');
+            if (e.target === modal) {
+                modal.classList.remove('active');
+                createForm?.reset();
+            }
         });
     }
 
-    const createForm = document.getElementById('createOrgForm');
     if (createForm) {
         createForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            toasts.info(
-                'Ваша заявка отправлена на проверку.',
-                {
+            console.log('📤 Форма отправлена');
+            
+            try {
+                const formData = new FormData(e.target);
+                
+                const orgName = formData.get('orgName')?.trim() || '';
+                const inn = formData.get('inn')?.trim() || '';
+                
+                if (!orgName) {
+                    toasts?.warning('Введите название организации', { duration: 3000 });
+                    return;
+                }
+                
+                if (!inn) {
+                    toasts?.warning('Введите ИНН', { duration: 3000 });
+                    return;
+                }
+                
+                const newOrg = {
+                    id: Date.now(),
+                    name: orgName,
+                    inn: inn,
+                    role: 'Владелец',
+                    status: 'pending',
+                    createdAt: new Date().toISOString().split('T')[0]
+                };
+                
+                console.log('Создаём организацию:', newOrg);
+                
+                organizationsData.push(newOrg);
+                
+                let orgRequests = JSON.parse(localStorage.getItem('ck_orgRequests')) || [];
+                orgRequests.push(newOrg);
+                localStorage.setItem('ck_orgRequests', JSON.stringify(orgRequests));
+                
+                // Закрываем и сбрасываем
+                if (modal) modal.classList.remove('active');
+                createForm.reset();
+                
+                // Обновляем список
+                initOrganizations();
+                
+                toasts?.info('Ваша заявка отправлена на проверку.', {
                     title: 'Организация создаётся',
                     duration: 5000
-                }
-            );
-            if (modal) modal.classList.remove('active');
+                });
+                
+            } catch (err) {
+                console.error('Ошибка при создании организации:', err);
+                toasts?.error('Не удалось создать организацию. Попробуйте ещё раз.', { duration: 4000 });
+            }
         });
     }
 }

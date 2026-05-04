@@ -1,9 +1,8 @@
 // ===== СИСТЕМА УВЕДОМЛЕНИЙ =====
-
 class ToastNotificationSystem {
     constructor() {
         this.toasts = [];
-        this.maxToasts = 3; // максимум одновременных уведомлений
+        this.maxToasts = 3;
         this.defaultDuration = 4000;
         this.init();
     }
@@ -22,6 +21,10 @@ class ToastNotificationSystem {
         }
     }
 
+    handleToastClick(toast) {
+        toast.remove();
+    }
+
     // Показать уведомление
     show(message, options = {}) {
         const {
@@ -30,7 +33,7 @@ class ToastNotificationSystem {
             duration = this.defaultDuration,
             tip = '',
             icon = '',
-            withProgress = true,
+            withProgress = false,
             closable = true
         } = options;
 
@@ -60,19 +63,18 @@ class ToastNotificationSystem {
 
         // Иконки по умолчанию
         const defaultIcons = {
-            success: '✅',
-            error: '❌',
-            warning: '⚠️',
-            info: 'ℹ️',
-            tip: '💡',
-            achievement: '🏆'
+            success: '',
+            error: '',
+            warning: '',
+            info: '',
+            tip: '',
+            achievement: ''
         };
 
-        const displayIcon = icon || defaultIcons[type] || '📢';
+        const displayIcon = icon || defaultIcons[type] || '';
         const displayTitle = title || this.getDefaultTitle(type);
 
         toast.innerHTML = `
-            <div class="toast-icon">${displayIcon}</div>
             <div class="toast-content">
                 <div class="toast-title">${displayTitle}</div>
                 <div class="toast-message">${message}</div>
@@ -98,16 +100,20 @@ class ToastNotificationSystem {
             });
         }
 
-        // Метод удаления
+        // В методе createToast():
+
+        // Сохраняем ссылку на оригинальный remove ПЕРЕД переопределением
+        const nativeRemove = Element.prototype.remove;
+
         toast.remove = (immediate = false) => {
             if (immediate) {
-                toast.remove();
+                nativeRemove.call(toast);  // ✅ Используем call()
                 return;
             }
             toast.classList.add('hide');
             setTimeout(() => {
                 if (toast.parentNode) {
-                    toast.parentNode.removeChild(toast);
+                    nativeRemove.call(toast);
                 }
                 this.toasts = this.toasts.filter(t => t !== toast);
             }, 300);
@@ -163,6 +169,3 @@ class ToastNotificationSystem {
 // Создаем глобальный экземпляр
 const toasts = new ToastNotificationSystem();
 window.toasts = toasts;
-
-// Экспорт
-export default toasts;
