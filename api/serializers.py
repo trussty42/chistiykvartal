@@ -79,8 +79,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'username',
             'email',
             'first_name',
+            'middle_name',
             'last_name',
-            'organizations'
+            'organizations',
+            'city',
+            'created_at',
         )
 
     def validate_email(self, value):
@@ -94,11 +97,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return value
 
     def get_organizations(self, obj):
-        return list(obj.employee_set.values(
-            'organization__id',
-            'organization__name',
-            'role_in_organization'
-        ))
+        return [
+        {
+            "id": emp.organization.id,
+            "name": emp.organization.name,
+            "role": emp.role_in_organization,
+        }
+        for emp in obj.employee.all()
+    ]
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -115,7 +121,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if (self.context['request'].method == 'POST'
-                and self.user.has_organization):
+                and self.context['request'].user.has_organization):
             raise serializers.ValidationError(
                 'Вы не можете состоять сразу в нескольких организациях'
             )

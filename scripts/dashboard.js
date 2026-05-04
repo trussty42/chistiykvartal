@@ -1,21 +1,5 @@
-// ===== ДАННЫЕ =====
-const userData = {
-    surname: 'Власова',
-    name: 'Софья',
-    middlename: 'Анатольевна',
-    login: 'sonixks',
-    email: 'sonixks@yandex.ru',
-    city: 'Екатеринбург',
-    totalWeight: 87,
-    totalTransactions: 12,
-    memberSince: '2025-04-15'
-};
-
-let historyData = JSON.parse(localStorage.getItem('ck_historyData')) || [
-    { date: '18.04.2026', point: 'Вторплюс', material: 'Пластик', weight: '5.2 кг', sum: '114 ₽', status: 'completed', hasReview: true, createdDate: '2026-04-18T10:00:00' },
-    { date: '21.05.2026', point: 'ЭкоПункт', material: 'Бумага', weight: '12 кг', sum: '96 ₽', status: 'completed', hasReview: false, createdDate: '2026-05-21T14:30:00' },
-    { date: '01.06.2026', point: 'Вторплюс', material: 'Стекло', weight: '3.1 кг', sum: '31 ₽', status: 'pending', hasReview: false, createdDate: new Date().toISOString() }
-];
+let historyData = [];
+let currentUser = null;
 
 const achievementsData = [
     { 
@@ -107,12 +91,10 @@ const achievementsData = [
 const organizationsData = [];
 
 // ===== ИНИЦИАЛИЗАЦИЯ =====
-document.addEventListener('DOMContentLoaded', () => {
-    initProfile();
-    initHistory();
-    initHistoryModal();
-    initAchievements();
-    initOrganizations();
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadProfile();
+    loadHistory();
+    initProfileForm();
     initOrgModalOnce();
     initTabs();
     initLogout();
@@ -133,22 +115,83 @@ function initTabs() {
     });
 }
 
-function initProfile() {
-    document.getElementById('userName').textContent = userData.login;
-    document.getElementById('inputSurname').value = userData.surname;    
-    document.getElementById('inputName').value = userData.name;
-    document.getElementById('inputMiddleName').value = userData.middlename;
-    document.getElementById('inputLogin').value = userData.login;
-    document.getElementById('inputEmail').value = userData.email;
-    document.getElementById('inputCity').value = userData.city;
+async function loadProfile() {
+    const token = localStorage.getItem('ck_access_token');
 
-    document.getElementById('profileForm').addEventListener('submit', (e) => {
+    const response = await fetch(`${API_URL}/users/me/`, {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    const user = await response.json();
+
+    currentUser = user;
+    localStorage.setItem('ck_currentUser', JSON.stringify(user));
+
+    fillProfile(user);
+    initOrganizations();
+}
+
+function fillProfile(user) {
+
+    document.getElementById('userName').textContent = user.username || '';
+
+    const joinedEl = document.getElementById('userJoined');
+    if (joinedEl) {
+        joinedEl.textContent = 'c нами с ' + formatDate(user.created_at);
+    }
+    document.getElementById('inputLogin').textContent = user.username || '';
+
+    document.getElementById('inputSurname').value = user.last_name || '';
+    document.getElementById('inputName').value = user.first_name || '';
+    document.getElementById('inputMiddleName').value = user.middle_name || '';
+
+    document.getElementById('inputLogin').value = user.username || '';
+    document.getElementById('inputEmail').value = user.email || '';
+    document.getElementById('inputCity').value = user.city || '';
+}
+
+function initProfileForm() {
+    const form = document.getElementById('profileForm');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const status = document.getElementById('formStatus');
 
-        toasts.success('Данные профиля обновлены!', {
-            duration: 3000
-        });
+        const token = localStorage.getItem('ck_access_token');
+
+        const data = {
+            username: document.getElementById('inputLogin').value,
+            email: document.getElementById('inputEmail').value,
+            first_name: document.getElementById('inputName').value,
+            last_name: document.getElementById('inputSurname').value,
+            middle_name: document.getElementById('inputMiddleName').value
+        };
+
+        try {
+            const response = await fetch(`${API_URL}/users/me/`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                throw new Error('Ошибка обновления');
+            }
+
+            const updatedUser = await response.json();
+            localStorage.setItem('ck_currentUser', JSON.stringify(updatedUser));
+
+            toasts.success('Профиль обновлён');
+
+        } catch (err) {
+            console.error(err);
+            toasts.error('Ошибка при обновлении');
+        }
     });
 }
 
@@ -284,153 +327,54 @@ function loadSavedAvatar() {
     }
 }
 
-function initHistory() {
+async function loadHistory() {
+    const token = localStorage.getItem('ck_access_token');
+    if (!token) return;
+
+    try {
+        const response = await fetch('http://127.0.0.1:8000/api/v1/history/', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Ошибка загрузки истории');
+        }
+
+        const data = await response.json();
+
+        historyData = data; // 🔥 КЛЮЧЕВОЕ
+
+        renderHistory(historyData);
+
+        initAchievements(); // 🔥 теперь можно безопасно
+
+    } catch (err) {
+        console.error('Ошибка истории:', err);
+    }
+}
+
+function renderHistory(historyData) {
     const tbody = document.getElementById('historyTableBody');
     if (!tbody) return;
 
-    checkPendingSubmissions();
-
-    tbody.innerHTML = historyData.map((row, index) => {
-        let statusText = 'Проверено';
-        let statusClass = 'completed';
-        if (row.status === 'pending') {
-            statusText = 'На проверке';
-            statusClass = 'pending';
-        } else if (row.status === 'unconfirmed') {
-            statusText = 'Не подтверждено';
-            statusClass = 'unconfirmed';
-        }
-
-        let feedbackCell = '';
-        if (row.status === 'completed') {
-            if (row.hasReview) {
-                feedbackCell = `<span class="review-badge">Отзыв оставлен</span>`;
-            } else {
-                feedbackCell = `<button class="btn-write-review" onclick="openReviewForm(${index})">Написать отзыв</button>`;
-            }
-        } else {
-            feedbackCell = `<span class="feedback-disabled">Недоступно</span>`;
-        }
-
-        return `
+    tbody.innerHTML = historyData.map(row => `
         <tr>
-            <td>${row.date}</td>
-            <td>${row.point}</td>
-            <td>${row.material}</td>
-            <td>${row.weight}</td>
-            <td>${row.sum || '-'}</td>
-            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-            <td>${feedbackCell}</td>
+            <td>${formatDate(row.created_at)}</td>
+            <td>${row.point || '-'}</td>
+            <td>${row.waste_type || '-'}</td>
+            <td>${row.weight} кг</td>
+            <td>${row.total_price} ₽</td>
+            <td><span class="status-badge completed">Проверено</span></td>
+            <td>-</td>
         </tr>
-        `;
-    }).join('');
+    `).join('');
 }
 
-function checkPendingSubmissions() {
-    const now = new Date();
-    let changed = false;
-
-    historyData.forEach(row => {
-        if (row.status === 'pending' && row.createdDate) {
-            const created = new Date(row.createdDate);
-            const diffDays = Math.ceil(Math.abs(now - created) / (1000 * 60 * 60 * 24));
-            if (diffDays > 7) {
-                row.status = 'unconfirmed';
-                changed = true;
-            }
-        }
-    });
-
-    if (changed) saveHistoryData();
-}
-
-function saveHistoryData() {
-    localStorage.setItem('ck_historyData', JSON.stringify(historyData));
-    initHistory();
-}
-
-function initHistoryModal() {
-    const modal = document.getElementById('submissionModal');
-    const openBtn = document.getElementById('addSubmissionBtn');
-    const closeBtn = document.getElementById('closeSubmissionModal');
-    const form = document.getElementById('submissionForm');
-
-    if (!modal || !openBtn) return;
-
-    openBtn.addEventListener('click', () => modal.classList.add('active'));
-    
-    closeBtn.addEventListener('click', () => {
-        modal.classList.remove('active');
-        form.reset();
-    });
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.classList.remove('active');
-            form.reset();
-        }
-    });
-
-    form.addEventListener('submit', (e) => {
-        e.preventDefault();
-
-        const point = document.getElementById('inputPoint').value;
-        const material = document.getElementById('inputMaterial').value;
-        const weight = document.getElementById('inputWeight').value;
-        const sum = document.getElementById('inputSum').value;
-
-        const today = new Date();
-        const dateStr = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
-
-        const newSubmission = {
-            date: dateStr,
-            point: point,
-            material: material,
-            weight: `${weight} кг`,
-            sum: sum ? `${sum} ₽` : null,
-            status: 'pending',
-            createdDate: new Date().toISOString(),
-            hasReview: false
-        };
-
-        historyData.unshift(newSubmission);
-        saveHistoryData();
-
-        let allRequests = JSON.parse(localStorage.getItem('ck_orgRequests')) || [];
-        allRequests.push(newSubmission);
-        localStorage.setItem('ck_orgRequests', JSON.stringify(allRequests));
-
-        const sortingTips = {
-            'Пластик': 'ПЭТ-бутылки нужно смять.',
-            'Бумага': 'Картонные коробки лучше разобрать.',
-            'Стекло': 'Крышки от стеклянных банок сдаются отдельно как металл.',
-            'Металл': 'Алюминиевые банки желательно промыть перед сдачей.',
-            'Электроника': 'Не разбирайте устройства самостоятельно - это опасно.',
-            'Батарейки': 'Храните батарейки в пластиковом контейнере до сдачи.',
-            'Текстиль': 'Постирайте вещи перед сдачей в переработку.'
-        };
-
-        const tip = sortingTips[material] || '';
-
-        modal.classList.remove('active');
-        form.reset();
-
-        if (tip) {
-            toasts.tip(
-                `Заявка в "${point}" создана!`,
-                tip,
-                {
-                    title: 'Сдача зарегистрирована',
-                    duration: 6000
-                }
-            );
-        } else {
-            toasts.success(
-                `Заявка в "${point}" создана! Ожидайте подтверждения.`,
-                { duration: 4000 }
-            );
-        }
-    });
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ru-RU');
 }
 
 window.openReviewForm = function(index) {
@@ -485,9 +429,6 @@ window.submitReview = function(index) {
         });
         return;
     }
-
-    historyData[index].hasReview = true;
-    saveHistoryData();
     
     document.querySelector('.modal-overlay')?.remove();
 
@@ -616,7 +557,6 @@ function updateAchievements() {
     });
 }
 
-// Сбор статистики пользователя
 function getUserStats() {
     const stats = {
         totalSubmissions: 0,
@@ -627,46 +567,36 @@ function getUserStats() {
         daysSinceRegistration: 0,
         hasOrganization: false
     };
-    
-    // Анализируем историю сдач
+
+    // 🔥 история теперь из API
     historyData.forEach(entry => {
-        if (entry.status === 'completed' || entry.status === 'pending') {
-            stats.totalSubmissions++;
-        }
-        
-        // Считаем вес
+        stats.totalSubmissions++;
+
         const weight = parseFloat(entry.weight);
         if (!isNaN(weight)) {
             stats.totalWeight += weight;
         }
-        
-        // Считаем заработок
-        const sum = parseFloat(entry.sum);
+
+        const sum = parseFloat(entry.total_price);
         if (!isNaN(sum)) {
             stats.totalEarnings += sum;
         }
-        
-        // Собираем уникальные типы материалов
-        if (entry.material) {
-            stats.uniqueMaterials.add(entry.material);
-        }
-        
-        // Считаем отзывы
-        if (entry.hasReview) {
-            stats.totalReviews++;
+
+        if (entry.waste_type) {
+            stats.uniqueMaterials.add(entry.waste_type);
         }
     });
-    
-    // Конвертируем Set в количество
+
     stats.uniqueMaterials = stats.uniqueMaterials.size;
-    
-    // Считаем дни с регистрации
-    const memberSince = new Date(userData.memberSince);
-    stats.daysSinceRegistration = Math.floor((Date.now() - memberSince) / (1000 * 60 * 60 * 24));
-    
-    // Проверяем наличие организации
-    stats.hasOrganization = organizationsData.some(org => org.role === 'Владелец' && org.status === 'verified');
-    
+
+    // 🔥 регистрация (если появится поле — используем)
+    if (currentUser && currentUser.date_joined) {
+        const created = new Date(currentUser.date_joined);
+        stats.daysSinceRegistration = Math.floor(
+            (Date.now() - created) / (1000 * 60 * 60 * 24)
+        );
+    }
+
     return stats;
 }
 
@@ -680,47 +610,29 @@ function saveAchievements() {
 }
 
 function initOrganizations() {
-    const savedOrgs = JSON.parse(localStorage.getItem('ck_orgRequests')) || [];
-    savedOrgs.forEach(savedOrg => {
-        if (!organizationsData.find(o => o.id === savedOrg.id)) {
-            organizationsData.push(savedOrg);
-        }
-    });
-    
-    const orgCount = document.getElementById('orgCount');
-    if (orgCount) orgCount.textContent = organizationsData.length;
-
-    const createBtn = document.getElementById('createOrgBtn');
-    if (createBtn) {
-        const owned = organizationsData.filter(o => o.role === 'Владелец').length;
-        createBtn.style.display = owned >= 1 ? 'none' : 'inline-flex';
-    }
-    
     const orgList = document.getElementById('orgList');
     if (!orgList) return;
 
-    orgList.innerHTML = organizationsData.map(org => `
-        <div class="org-card" data-id="${org.id}" style="cursor: pointer;">
+    const user = JSON.parse(localStorage.getItem('ck_currentUser')) || {};
+    const organizations = user.organizations || [];
+
+    if (orgCount) {
+        orgCount.textContent = organizations.length;
+    }
+
+    if (organizations.length === 0) {
+        orgList.innerHTML = `<p>У вас пока нет организаций</p>`;
+        return;
+    }
+
+    orgList.innerHTML = organizations.map(org => `
+        <div class="org-card" data-id="${org.id}">
             <div class="org-info">
                 <span class="org-name">${org.name}</span>
                 <span class="org-role">${org.role}</span>
             </div>
-            <div style="display:flex;align-items:center;gap:12px;">
-                <span class="org-status ${org.status}">
-                    ${org.status === 'verified' ? 'Проверена' : org.status === 'pending' ? 'На проверке' : 'Отклонена'}
-                </span>
-            </div>
         </div>
     `).join('');
-
-    // Клик по организации → переход в кабинет
-    orgList.onclick = (e) => {
-        const card = e.target.closest('.org-card');
-        if (card) {
-            const orgId = card.dataset.id;
-            window.location.href = `org-dashboard.html?id=${orgId}`;
-        }
-    };
 }
 
 function initOrgModalOnce() {
@@ -761,60 +673,49 @@ function initOrgModalOnce() {
     }
 
     if (createForm) {
-        createForm.addEventListener('submit', (e) => {
+        createForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            console.log('📤 Форма отправлена');
-            
-            try {
-                const formData = new FormData(e.target);
-                
-                const orgName = formData.get('orgName')?.trim() || '';
-                const inn = formData.get('inn')?.trim() || '';
-                
-                if (!orgName) {
-                    toasts?.warning('Введите название организации', { duration: 3000 });
-                    return;
-                }
-                
-                if (!inn) {
-                    toasts?.warning('Введите ИНН', { duration: 3000 });
-                    return;
-                }
-                
-                const newOrg = {
-                    id: Date.now(),
-                    name: orgName,
-                    inn: inn,
-                    role: 'Владелец',
-                    status: 'pending',
-                    createdAt: new Date().toISOString().split('T')[0]
-                };
-                
-                console.log('Создаём организацию:', newOrg);
-                
-                organizationsData.push(newOrg);
-                
-                let orgRequests = JSON.parse(localStorage.getItem('ck_orgRequests')) || [];
-                orgRequests.push(newOrg);
-                localStorage.setItem('ck_orgRequests', JSON.stringify(orgRequests));
-                
-                // Закрываем и сбрасываем
-                if (modal) modal.classList.remove('active');
-                createForm.reset();
-                
-                // Обновляем список
-                initOrganizations();
-                
-                toasts?.info('Ваша заявка отправлена на проверку.', {
-                    title: 'Организация создаётся',
-                    duration: 5000
-                });
-                
-            } catch (err) {
-                console.error('Ошибка при создании организации:', err);
-                toasts?.error('Не удалось создать организацию. Попробуйте ещё раз.', { duration: 4000 });
-            }
+
+            const formData = new FormData(e.target);
+
+            await createOrganization(formData); // 🔥 API
+
+            modal.classList.remove('active');
+            createForm.reset();
         });
+    }
+}
+
+async function createOrganization(formData) {
+    const token = localStorage.getItem('ck_access_token');
+    if (!token) return;
+
+    try {
+        const response = await fetch('http://127.0.0.1:8000/api/v1/organizations/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: formData.get('orgName'),
+                inn: formData.get('inn')
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(JSON.stringify(err));
+        }
+
+        await loadProfile();
+        initOrganizations();
+
+        toasts.success('Организация создана!');
+
+    } catch (err) {
+        console.error(err);
+        toasts.error('Ошибка создания организации');
     }
 }
 

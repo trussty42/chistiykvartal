@@ -47,7 +47,7 @@ class User(AbstractUser):
 
     @property
     def has_organization(self):
-        return self.user.organization.exist()
+        return self.employee.exists()
 
 
 class Organization(models.Model):
@@ -63,7 +63,7 @@ class Organization(models.Model):
     )
     inn = models.CharField(max_length=12, verbose_name='ИНН', unique=True)
     phone = PhoneNumberField(verbose_name='Номер телефона')
-    email = models.EmailField(verbose_name='Почта', unique=True)
+    email = models.EmailField(verbose_name='Почта', unique=True, blank=True, null=True)
     logo = models.ImageField(
         upload_to='organizations/', verbose_name='Логотип'
     )

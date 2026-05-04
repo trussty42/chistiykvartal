@@ -13,7 +13,7 @@ def validate_inn_by_api(value):
     token = os.getenv('INN_API_TOKEN')
     dadata = Dadata(token)
     result = dadata.find_by_id('party', value)
-    return result.count > 0
+    return len(result) > 0
 
 
 def has_organization_rights(user, organization):

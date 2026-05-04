@@ -5,6 +5,7 @@ from api.serializers import (OrganizationNewsSerializer,
                              SubmissionHistorySerializer, UserLoginSerializer,
                              UserProfileSerializer, UserRegistrationSerializer,
                              ReviewSerializer)
+from api.pagination import NewsPagination
 from api.service import has_organization_rights
 from api.filters import PickUpPointFilter, WasteTypesFilter
 from config.constants import COMPANY_LEADER
@@ -182,6 +183,7 @@ class NewsViewSet(ModelViewSet):
     queryset = OrganizationNews.objects.filter(is_published=True).order_by('-created_at')
     serializer_class = OrganizationNewsSerializer
     permission_classes = (IsAdminOrModerator,)
+    pagination_class = NewsPagination
 
 
 class SubmissionHistoryViewSet(ModelViewSet):

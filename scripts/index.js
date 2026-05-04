@@ -9,14 +9,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. Кнопки в hero
     initHeroButtons();
     
-    // 4. "Читать полностью" в новостях
-    initNewsToggle();
+    // 4. Загрузка новостей с API
+    loadNews();
     
-    // 5. Кнопка входа/профиля — ТЕПЕРЬ БЕРЁМ ИЗ auth.js
+    // 5. Кнопка входа/профиля
     if (typeof initAuthButton === 'function') {
         initAuthButton();
     }
 });
+
+
+// -------------------- НАВИГАЦИЯ --------------------
 
 function setActiveLink() {
     const currentPage = window.location.pathname.split('/').pop() || 'index.html';
@@ -28,6 +31,9 @@ function setActiveLink() {
         }
     });
 }
+
+
+// -------------------- МЕНЮ --------------------
 
 function initMobileMenu() {
     const burger = document.querySelector('.header__burger');
@@ -61,6 +67,9 @@ function initMobileMenu() {
     });
 }
 
+
+// -------------------- HERO --------------------
+
 function initHeroButtons() {
     const catalogBtn = document.querySelector('.hero__button-catalog');
     const mapBtn = document.querySelector('.hero__button-map');
@@ -72,6 +81,56 @@ function initHeroButtons() {
         mapBtn.addEventListener('click', () => window.location.href = 'map.html');
     }
 }
+
+
+// -------------------- НОВОСТИ --------------------
+
+async function loadNews() {
+    try {
+        const response = await fetch('http://127.0.0.1:8000/api/v1/news/');
+        const data = await response.json();
+
+        // если DRF pagination
+        const newsList = data.results || data;
+
+        renderNews(newsList);
+    } catch (error) {
+        console.error('Ошибка загрузки новостей:', error);
+    }
+}
+
+
+function renderNews(newsList) {
+    const container = document.querySelector('.news-cards');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    newsList.forEach(news => {
+        const el = document.createElement('article');
+        el.className = 'news-card';
+
+        el.innerHTML = `
+            <p class="news-card__date">${formatDate(news.created_at)}</p>
+            <h3 class="news-card__title">${news.title}</h3>
+            <div class="news-card__content">
+                <p class="news-card__short">${getShortText(news)}</p>
+                <div class="news-card__full">
+                    <p>${news.text}</p>
+                </div>
+            </div>
+            <button class="button__read-more">
+                <span class="button__text">Читать полностью</span>
+            </button>
+        `;
+
+        container.appendChild(el);
+    });
+
+    // перевешиваем обработчики
+    initNewsToggle();
+}
+
 
 function initNewsToggle() {
     document.querySelectorAll('.button__read-more').forEach(button => {
@@ -91,5 +150,25 @@ function initNewsToggle() {
                 newsItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         });
+    });
+}
+
+
+// -------------------- УТИЛИТЫ --------------------
+
+function getShortText(news) {
+    if (news.short_description) return news.short_description;
+    return news.content ? news.content.slice(0, 120) + '...' : '';
+}
+
+
+function formatDate(dateString) {
+    if (!dateString) return '';
+    
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
     });
 }

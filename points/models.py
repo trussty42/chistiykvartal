@@ -81,10 +81,10 @@ class PointWasteTypes(models.Model):
 
 class SubmissionHistory(models.Model):
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name='submissions', verbose_name='Пользователь'
+        User, on_delete=models.CASCADE, verbose_name='Пользователь'
     )
     point = models.ForeignKey(
-        PickUpPoint, on_delete=models.CASCADE, related_name='submissions', verbose_name='Пункт приёма'
+        PickUpPoint, on_delete=models.CASCADE, verbose_name='Пункт приёма'
     )
     waste_type = models.ForeignKey(
         PointWasteTypes, on_delete=models.SET_NULL, null=True, verbose_name='Тип отхода'
@@ -101,6 +101,7 @@ class SubmissionHistory(models.Model):
         verbose_name = 'История сдачи'
         verbose_name_plural = 'История сдач'
         ordering = ['-created_at']
+        default_related_name = 'submissions'
 
     def __str__(self):
         return f'{self.created_at.strftime("%Y-%m-%d")} - {self.user.username} - {self.weight} кг'
